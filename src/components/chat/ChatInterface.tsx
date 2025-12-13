@@ -4,13 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, User, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-}
+import { usePharmaChat } from "@/hooks/usePharmaChat";
 
 const suggestedQuestions = [
   "What are the top drug repurposing opportunities for oncology?",
@@ -21,9 +15,8 @@ const suggestedQuestions = [
 ];
 
 export function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, isLoading, sendMessage } = usePharmaChat();
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,31 +25,10 @@ export function ChatInterface() {
     }
   }, [messages]);
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!input.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: input.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    sendMessage(input.trim());
     setInput("");
-    setIsLoading(true);
-
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: generateMockResponse(userMessage.content),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsLoading(false);
-    }, 1500);
   };
 
   const handleSuggestionClick = (question: string) => {
@@ -154,7 +126,7 @@ export function ChatInterface() {
                 </div>
               </div>
             ))}
-            {isLoading && (
+            {isLoading && messages[messages.length - 1]?.role === "user" && (
               <div className="flex gap-4">
                 <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent text-primary-foreground flex items-center justify-center">
                   <Bot className="w-4 h-4" />
@@ -198,106 +170,4 @@ export function ChatInterface() {
       </div>
     </div>
   );
-}
-
-function generateMockResponse(question: string): string {
-  const lowerQuestion = question.toLowerCase();
-  
-  if (lowerQuestion.includes("repurposing") || lowerQuestion.includes("opportunities")) {
-    return `## Drug Repurposing Opportunities Analysis
-
-### Opportunity Overview
-Based on the pharmaceutical innovation framework, several high-potential repurposing opportunities have been identified:
-
-### Supporting Evidence
-• **Metformin for Anti-Aging**: Strong clinical evidence supports potential use beyond diabetes
-• **Thalidomide Derivatives**: Successful repurposing for multiple myeloma demonstrates pathway
-• **Sildenafil for PAH**: Example of successful indication expansion
-
-### Market Insight
-The global drug repurposing market is projected to grow significantly, driven by:
-- Reduced development timelines (3-5 years vs 10-15 years)
-- Lower R&D costs (estimated 60-70% reduction)
-- Established safety profiles
-
-### Strategic Recommendation
-**GO Decision** - Prioritize molecules with:
-1. Expiring patents in key therapeutic areas
-2. Known mechanism of action with broad applicability
-3. Favorable safety profiles enabling indication expansion
-
-### Risks & Limitations
-- Regulatory pathway complexity varies by indication
-- Patent landscape requires careful navigation
-- Clinical evidence requirements may differ by region`;
-  }
-  
-  if (lowerQuestion.includes("clinical trial") || lowerQuestion.includes("trials")) {
-    return `## Clinical Trial Landscape Analysis
-
-### Opportunity Overview
-Current clinical trial activity reveals significant pipeline activity and competitive dynamics.
-
-### Supporting Evidence
-• **Active Trials**: Over 400,000 registered clinical trials globally
-• **Key Therapeutic Areas**: Oncology leads with 35% of all trials
-• **Emerging Focus**: Cell & gene therapy trials increased 40% YoY
-
-### Market Insight
-- Phase III trials show 50% success rate on average
-- Adaptive trial designs gaining regulatory acceptance
-- Decentralized trials reducing patient burden
-
-### Patent / Regulatory Considerations
-- FDA breakthrough therapy designations accelerating timelines
-- EMA parallel scientific advice available
-- Emerging market regulatory harmonization ongoing
-
-### Strategic Recommendation
-Focus resources on therapeutic areas with:
-1. High unmet need and limited competition
-2. Clear regulatory pathways
-3. Strong biomarker-driven patient selection
-
-### Risks & Limitations
-- Trial enrollment challenges post-pandemic
-- Supply chain considerations for complex biologics
-- Evolving regulatory requirements in emerging markets`;
-  }
-  
-  return `## Innovation Analysis
-
-### Opportunity Overview
-Your query has been analyzed against our pharmaceutical innovation framework.
-
-### Supporting Evidence
-Based on the AI-Powered Agentic Solution for Pharmaceutical Innovation methodology:
-• Data-driven insights enable faster decision making
-• Integration of multiple data sources provides comprehensive view
-• Structured analysis reduces bias in innovation decisions
-
-### Market Insight
-The pharmaceutical industry continues to evolve with:
-- Increased focus on precision medicine
-- Growing importance of real-world evidence
-- Digital health integration accelerating
-
-### Patent / Regulatory Considerations
-- Freedom-to-operate analysis recommended before major investments
-- Early regulatory engagement advised for novel mechanisms
-- Global regulatory strategy needed for international programs
-
-### Strategic Recommendation
-Consider a phased approach:
-1. Initial feasibility assessment
-2. Competitive intelligence gathering
-3. Proof-of-concept validation
-4. Full development decision
-
-### Risks & Limitations
-- Market dynamics may shift during development
-- Regulatory requirements continue to evolve
-- Competition may emerge from unexpected sources
-
-*Note: This analysis is based on general pharmaceutical innovation principles. Specific decisions should incorporate additional due diligence.*`;
 }

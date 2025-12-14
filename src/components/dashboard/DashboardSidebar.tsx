@@ -55,7 +55,7 @@ export function DashboardSidebar() {
           </div>
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="font-display font-bold text-sidebar-foreground">PharmaInnovate</span>
+              <span className="font-display font-bold text-sidebar-foreground">Medlens</span>
               <span className="text-xs text-sidebar-foreground/60">AI Platform</span>
             </div>
           )}

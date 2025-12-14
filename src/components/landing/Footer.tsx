@@ -12,7 +12,7 @@ export const Footer = () => {
               <FlaskConical className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <span className="font-display font-bold text-lg">PharmaInnovate AI</span>
+              <span className="font-display font-bold text-lg">Medlens</span>
               <p className="text-xs text-muted-foreground">Designed & Developed by Pre</p>
             </div>
           </div>
@@ -32,7 +32,7 @@ export const Footer = () => {
 
           {/* Copyright */}
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} PharmaInnovate AI. All rights reserved.
+            © {new Date().getFullYear()} Medlens. All rights reserved.
           </p>
         </div>
       </div>

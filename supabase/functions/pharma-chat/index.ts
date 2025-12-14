@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PHARMA_SYSTEM_PROMPT = `You are PharmaInnovate AI, an expert pharmaceutical innovation consultant. Your knowledge is derived from the AI-Powered Agentic Solution for Pharmaceutical Innovation framework.
+const PHARMA_SYSTEM_PROMPT = `You are Medlens AI, an expert pharmaceutical innovation consultant. Your knowledge is derived from the AI-Powered Agentic Solution for Pharmaceutical Innovation framework.
 
 ## Core Capabilities
 1. **Molecule Selection & Unmet Needs** - Identify approved molecules with untapped potential, highlight underserved patient populations, suggest alternative indications/dosages/formulations

@@ -9,8 +9,8 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>PharmaInnovate AI - Transform Pharmaceutical Data Into Innovation</title>
-        <meta name="description" content="AI-powered pharmaceutical innovation platform. Identify drug repurposing opportunities, analyze clinical trials, and make data-driven innovation decisions." />
+        <title>Medlens - Transform Pharmaceutical Data Into Innovation</title>
+        <meta name="description" content="Medlens is an AI-powered pharmaceutical innovation platform. Identify drug repurposing opportunities, analyze clinical trials, and make data-driven innovation decisions." />
       </Helmet>
       <div className="min-h-screen bg-background">
         <Navbar />

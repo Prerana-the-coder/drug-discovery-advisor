@@ -22,9 +22,11 @@ import {
   FileCheck, 
   Lightbulb,
   Home,
-  HelpCircle
+  LogOut
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 
 const mainItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
@@ -43,6 +45,7 @@ export function DashboardSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { signOut, user } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -127,11 +130,22 @@ export function DashboardSidebar() {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Sign Out">
+              <button 
+                onClick={() => signOut()} 
+                className="flex items-center gap-3 text-sidebar-foreground/60 hover:text-sidebar-foreground w-full"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign Out</span>
+              </button>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
-        {!collapsed && (
+        {!collapsed && user && (
           <div className="mt-4 pt-4 border-t border-sidebar-border">
-            <p className="text-xs text-sidebar-foreground/40 text-center">
-              Designed by Pre
+            <p className="text-xs text-sidebar-foreground/40 text-center truncate">
+              {user.email}
             </p>
           </div>
         )}

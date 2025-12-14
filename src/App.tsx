@@ -9,6 +9,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/AuthPage";
+import ProfilePage from "./pages/ProfilePage";
 import { DashboardLayout } from "./components/dashboard/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import ChatPage from "./pages/ChatPage";
@@ -46,6 +47,7 @@ const App = () => (
                 <Route path="repurposing" element={<RepurposingPage />} />
                 <Route path="patents" element={<PatentsPage />} />
                 <Route path="strategy" element={<StrategyPage />} />
+                <Route path="profile" element={<ProfilePage />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

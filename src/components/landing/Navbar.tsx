@@ -1,10 +1,17 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { FlaskConical, Menu, X } from "lucide-react";
+import { FlaskConical, Menu, X, LogOut } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    setIsOpen(false);
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
@@ -44,11 +51,24 @@ export const Navbar = () => {
 
           {/* CTA */}
           <div className="hidden md:flex items-center gap-4">
-            <Link to="/dashboard/chat">
-              <Button variant="gradient">
-                Launch AI Assistant
-              </Button>
-            </Link>
+            {user ? (
+              <>
+                <Link to="/dashboard/chat">
+                  <Button variant="gradient">
+                    AI Assistant
+                  </Button>
+                </Link>
+                <Button variant="outline" size="icon" onClick={handleSignOut}>
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </>
+            ) : (
+              <Link to="/auth">
+                <Button variant="gradient">
+                  Sign In
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -85,11 +105,25 @@ export const Navbar = () => {
               >
                 Dashboard
               </Link>
-              <Link to="/dashboard/chat" onClick={() => setIsOpen(false)}>
-                <Button variant="gradient" className="w-full">
-                  Launch AI Assistant
-                </Button>
-              </Link>
+              {user ? (
+                <>
+                  <Link to="/dashboard/chat" onClick={() => setIsOpen(false)}>
+                    <Button variant="gradient" className="w-full">
+                      AI Assistant
+                    </Button>
+                  </Link>
+                  <Button variant="outline" className="w-full" onClick={handleSignOut}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <Link to="/auth" onClick={() => setIsOpen(false)}>
+                  <Button variant="gradient" className="w-full">
+                    Sign In
+                  </Button>
+                </Link>
+              )}
             </nav>
           </div>
         )}

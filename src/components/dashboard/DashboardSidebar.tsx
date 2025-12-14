@@ -22,7 +22,8 @@ import {
   FileCheck, 
   Lightbulb,
   Home,
-  LogOut
+  LogOut,
+  User
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,6 +32,7 @@ import { Button } from "@/components/ui/button";
 const mainItems = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
   { title: "AI Assistant", url: "/dashboard/chat", icon: MessageSquare },
+  { title: "Profile", url: "/dashboard/profile", icon: User },
 ];
 
 const moduleItems = [

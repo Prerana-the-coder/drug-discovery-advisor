@@ -23,7 +23,8 @@ import {
   Lightbulb,
   Home,
   LogOut,
-  User
+  User,
+  Target
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,6 +42,7 @@ const moduleItems = [
   { title: "Repurposing", url: "/dashboard/repurposing", icon: TrendingUp },
   { title: "Patent & Regulatory", url: "/dashboard/patents", icon: FileCheck },
   { title: "Innovation Strategy", url: "/dashboard/strategy", icon: Lightbulb },
+  { title: "Analysis Hub", url: "/dashboard/analysis", icon: Target },
 ];
 
 export function DashboardSidebar() {

@@ -18,6 +18,7 @@ import TrialsPage from "./pages/modules/TrialsPage";
 import RepurposingPage from "./pages/modules/RepurposingPage";
 import PatentsPage from "./pages/modules/PatentsPage";
 import StrategyPage from "./pages/modules/StrategyPage";
+import AnalysisHubPage from "./pages/modules/AnalysisHubPage";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
                 <Route path="repurposing" element={<RepurposingPage />} />
                 <Route path="patents" element={<PatentsPage />} />
                 <Route path="strategy" element={<StrategyPage />} />
+                <Route path="analysis" element={<AnalysisHubPage />} />
                 <Route path="profile" element={<ProfilePage />} />
               </Route>
               <Route path="*" element={<NotFound />} />

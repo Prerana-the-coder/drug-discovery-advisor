@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Mail, Calendar } from "lucide-react";
+import { Loader2, User, Mail, Calendar, Volume2, Bell, Palette, Shield } from "lucide-react";
 import { z } from "zod";
 
 const displayNameSchema = z.string().trim().max(100, "Display name must be less than 100 characters");
@@ -18,6 +20,12 @@ const ProfilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Settings state
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [selectedVoice, setSelectedVoice] = useState("sarah");
+  const [notifications, setNotifications] = useState(true);
+  const [theme, setTheme] = useState("system");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -34,11 +42,38 @@ const ProfilePage = () => {
       } else if (data) {
         setDisplayName(data.display_name || "");
       }
+      
+      // Load saved settings from localStorage
+      const savedSettings = localStorage.getItem("medlens_settings");
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        setVoiceEnabled(settings.voiceEnabled ?? true);
+        setSelectedVoice(settings.selectedVoice ?? "sarah");
+        setNotifications(settings.notifications ?? true);
+        setTheme(settings.theme ?? "system");
+      }
+      
       setIsLoading(false);
     };
 
     fetchProfile();
   }, [user]);
+
+  const saveSettings = () => {
+    const settings = {
+      voiceEnabled,
+      selectedVoice,
+      notifications,
+      theme,
+    };
+    localStorage.setItem("medlens_settings", JSON.stringify(settings));
+  };
+
+  useEffect(() => {
+    if (!isLoading) {
+      saveSettings();
+    }
+  }, [voiceEnabled, selectedVoice, notifications, theme]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -70,7 +105,7 @@ const ProfilePage = () => {
     } else {
       toast({
         title: "Profile updated",
-        description: "Your display name has been saved.",
+        description: "Your profile has been saved.",
       });
     }
   };
@@ -92,10 +127,11 @@ const ProfilePage = () => {
         </p>
       </div>
 
+      {/* Account Information */}
       <Card className="glass-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
+            <User className="w-5 h-5 text-primary" />
             Account Information
           </CardTitle>
           <CardDescription>
@@ -160,6 +196,133 @@ const ProfilePage = () => {
               "Save Changes"
             )}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Voice Settings */}
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Volume2 className="w-5 h-5 text-primary" />
+            Voice Settings
+          </CardTitle>
+          <CardDescription>
+            Configure text-to-speech preferences for AI responses.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Enable Voice Output</Label>
+              <p className="text-sm text-muted-foreground">
+                Allow AI to read responses aloud
+              </p>
+            </div>
+            <Switch
+              checked={voiceEnabled}
+              onCheckedChange={setVoiceEnabled}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Voice Selection</Label>
+            <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sarah">Sarah (Professional)</SelectItem>
+                <SelectItem value="roger">Roger (Deep)</SelectItem>
+                <SelectItem value="alice">Alice (Friendly)</SelectItem>
+                <SelectItem value="brian">Brian (Narrator)</SelectItem>
+                <SelectItem value="lily">Lily (Warm)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Choose the voice style for AI responses
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notification Settings */}
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5 text-primary" />
+            Notifications
+          </CardTitle>
+          <CardDescription>
+            Manage your notification preferences.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Enable Notifications</Label>
+              <p className="text-sm text-muted-foreground">
+                Receive updates about new features and insights
+              </p>
+            </div>
+            <Switch
+              checked={notifications}
+              onCheckedChange={setNotifications}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Appearance Settings */}
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="w-5 h-5 text-primary" />
+            Appearance
+          </CardTitle>
+          <CardDescription>
+            Customize the look and feel of the application.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label>Theme</Label>
+            <Select value={theme} onValueChange={setTheme}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+                <SelectItem value="system">System Default</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Select your preferred color theme
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Security */}
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" />
+            Security
+          </CardTitle>
+          <CardDescription>
+            Manage your account security settings.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+            <p className="text-sm text-muted-foreground">
+              Your account is secured with email authentication. For additional security options, please contact support.
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Designed & Developed by Prerana
+          </p>
         </CardContent>
       </Card>
     </div>

@@ -8,14 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User, Mail, Calendar, Volume2, Bell, Palette, Shield } from "lucide-react";
+import { Loader2, User, Mail, Calendar, Volume2, Bell, Palette, Shield, Sun, Moon, Monitor } from "lucide-react";
 import { z } from "zod";
+import { useTheme } from "@/components/ThemeProvider";
 
 const displayNameSchema = z.string().trim().max(100, "Display name must be less than 100 characters");
 
 const ProfilePage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [displayName, setDisplayName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -25,7 +27,6 @@ const ProfilePage = () => {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [selectedVoice, setSelectedVoice] = useState("sarah");
   const [notifications, setNotifications] = useState(true);
-  const [theme, setTheme] = useState("system");
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -50,7 +51,6 @@ const ProfilePage = () => {
         setVoiceEnabled(settings.voiceEnabled ?? true);
         setSelectedVoice(settings.selectedVoice ?? "sarah");
         setNotifications(settings.notifications ?? true);
-        setTheme(settings.theme ?? "system");
       }
       
       setIsLoading(false);
@@ -199,6 +199,53 @@ const ProfilePage = () => {
         </CardContent>
       </Card>
 
+      {/* Appearance Settings */}
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="w-5 h-5 text-primary" />
+            Appearance
+          </CardTitle>
+          <CardDescription>
+            Customize the look and feel of the application.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <Label>Theme</Label>
+            <div className="grid grid-cols-3 gap-3">
+              <Button
+                variant={theme === "light" ? "default" : "outline"}
+                className={`flex flex-col gap-2 h-auto py-4 ${theme === "light" ? "bg-primary" : ""}`}
+                onClick={() => setTheme("light")}
+              >
+                <Sun className="w-5 h-5" />
+                <span className="text-xs">Light</span>
+              </Button>
+              <Button
+                variant={theme === "dark" ? "default" : "outline"}
+                className={`flex flex-col gap-2 h-auto py-4 ${theme === "dark" ? "bg-primary" : ""}`}
+                onClick={() => setTheme("dark")}
+              >
+                <Moon className="w-5 h-5" />
+                <span className="text-xs">Dark</span>
+              </Button>
+              <Button
+                variant={theme === "system" ? "default" : "outline"}
+                className={`flex flex-col gap-2 h-auto py-4 ${theme === "system" ? "bg-primary" : ""}`}
+                onClick={() => setTheme("system")}
+              >
+                <Monitor className="w-5 h-5" />
+                <span className="text-xs">System</span>
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Select your preferred color theme
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Voice Settings */}
       <Card className="glass-card">
         <CardHeader>
@@ -268,37 +315,6 @@ const ProfilePage = () => {
               checked={notifications}
               onCheckedChange={setNotifications}
             />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Appearance Settings */}
-      <Card className="glass-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="w-5 h-5 text-primary" />
-            Appearance
-          </CardTitle>
-          <CardDescription>
-            Customize the look and feel of the application.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label>Theme</Label>
-            <Select value={theme} onValueChange={setTheme}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">Light</SelectItem>
-                <SelectItem value="dark">Dark</SelectItem>
-                <SelectItem value="system">System Default</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Select your preferred color theme
-            </p>
           </div>
         </CardContent>
       </Card>

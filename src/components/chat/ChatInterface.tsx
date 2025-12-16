@@ -12,12 +12,20 @@ import {
   Volume2, 
   VolumeX,
   Pill,
-  X
+  X,
+  Download,
+  FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePharmaChat, ChatMessage } from "@/hooks/usePharmaChat";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const suggestedQuestions = [
   "What are the top drug repurposing opportunities for oncology?",
@@ -152,8 +160,126 @@ export function ChatInterface() {
     }
   };
 
+  const exportAsText = () => {
+    if (messages.length === 0) {
+      toast({ title: "No messages to export", variant: "destructive" });
+      return;
+    }
+
+    const content = messages
+      .map((m) => {
+        const time = m.timestamp.toLocaleString();
+        const role = m.role === "user" ? "You" : "Medlens AI";
+        return `[${time}] ${role}:\n${m.content}\n`;
+      })
+      .join("\n---\n\n");
+
+    const header = `Medlens AI Conversation Export\nExported on: ${new Date().toLocaleString()}\n\n${"=".repeat(50)}\n\n`;
+    const footer = `\n${"=".repeat(50)}\nDesigned & Developed by Prerana`;
+
+    const blob = new Blob([header + content + footer], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `medlens-chat-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Conversation exported successfully" });
+  };
+
+  const exportAsMarkdown = () => {
+    if (messages.length === 0) {
+      toast({ title: "No messages to export", variant: "destructive" });
+      return;
+    }
+
+    const content = messages
+      .map((m) => {
+        const time = m.timestamp.toLocaleString();
+        const role = m.role === "user" ? "**You**" : "**Medlens AI**";
+        return `### ${role} - *${time}*\n\n${m.content}\n`;
+      })
+      .join("\n---\n\n");
+
+    const header = `# Medlens AI Conversation\n\n*Exported on: ${new Date().toLocaleString()}*\n\n---\n\n`;
+    const footer = `\n---\n\n*Designed & Developed by Prerana*`;
+
+    const blob = new Blob([header + content + footer], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `medlens-chat-${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Conversation exported as Markdown" });
+  };
+
+  const exportAsJSON = () => {
+    if (messages.length === 0) {
+      toast({ title: "No messages to export", variant: "destructive" });
+      return;
+    }
+
+    const data = {
+      exportedAt: new Date().toISOString(),
+      application: "Medlens AI",
+      developer: "Prerana",
+      messages: messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp.toISOString(),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `medlens-chat-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Conversation exported as JSON" });
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] max-h-[800px]">
+      {/* Header with Export */}
+      {messages.length > 0 && (
+        <div className="flex justify-end mb-4">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportAsText}>
+                <FileText className="w-4 h-4 mr-2" />
+                Export as Text (.txt)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportAsMarkdown}>
+                <FileText className="w-4 h-4 mr-2" />
+                Export as Markdown (.md)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportAsJSON}>
+                <FileText className="w-4 h-4 mr-2" />
+                Export as JSON (.json)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+
       {/* Messages Area */}
       <ScrollArea ref={scrollRef} className="flex-1 pr-4">
         {messages.length === 0 ? (

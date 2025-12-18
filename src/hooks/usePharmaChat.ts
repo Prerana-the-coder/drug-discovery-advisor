@@ -1,5 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -109,12 +111,164 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+export interface ChatSession {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export function usePharmaChat() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+
+  // Load sessions on mount
+  useEffect(() => {
+    if (user) {
+      loadSessions();
+    } else {
+      setSessions([]);
+      setCurrentSessionId(null);
+      setMessages([]);
+      setIsLoadingSessions(false);
+    }
+  }, [user]);
+
+  const loadSessions = async () => {
+    if (!user) return;
+    
+    setIsLoadingSessions(true);
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false });
+
+    if (error) {
+      console.error("Error loading sessions:", error);
+    } else {
+      setSessions(data || []);
+    }
+    setIsLoadingSessions(false);
+  };
+
+  const loadMessages = async (sessionId: string) => {
+    const { data, error } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("Error loading messages:", error);
+      return;
+    }
+
+    const loadedMessages: ChatMessage[] = (data || []).map((m) => ({
+      id: m.id,
+      role: m.role as "user" | "assistant",
+      content: m.content,
+      timestamp: new Date(m.created_at),
+    }));
+
+    setMessages(loadedMessages);
+    setCurrentSessionId(sessionId);
+  };
+
+  const createSession = async (title?: string) => {
+    if (!user) return null;
+
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .insert({
+        user_id: user.id,
+        title: title || "New Chat",
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error creating session:", error);
+      toast.error("Failed to create new chat session");
+      return null;
+    }
+
+    setSessions((prev) => [data, ...prev]);
+    setCurrentSessionId(data.id);
+    setMessages([]);
+    return data.id;
+  };
+
+  const deleteSession = async (sessionId: string) => {
+    const { error } = await supabase
+      .from("chat_sessions")
+      .delete()
+      .eq("id", sessionId);
+
+    if (error) {
+      console.error("Error deleting session:", error);
+      toast.error("Failed to delete chat session");
+      return;
+    }
+
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    
+    if (currentSessionId === sessionId) {
+      setCurrentSessionId(null);
+      setMessages([]);
+    }
+    
+    toast.success("Chat deleted");
+  };
+
+  const updateSessionTitle = async (sessionId: string, title: string) => {
+    const { error } = await supabase
+      .from("chat_sessions")
+      .update({ title })
+      .eq("id", sessionId);
+
+    if (error) {
+      console.error("Error updating session title:", error);
+      return;
+    }
+
+    setSessions((prev) =>
+      prev.map((s) => (s.id === sessionId ? { ...s, title } : s))
+    );
+  };
+
+  const saveMessage = async (sessionId: string, role: string, content: string) => {
+    const { error } = await supabase.from("chat_messages").insert({
+      session_id: sessionId,
+      role,
+      content,
+    });
+
+    if (error) {
+      console.error("Error saving message:", error);
+    }
+
+    // Update session's updated_at
+    await supabase
+      .from("chat_sessions")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", sessionId);
+  };
 
   const sendMessage = useCallback(async (input: string) => {
     if (!input.trim() || isLoading) return;
+
+    let sessionId = currentSessionId;
+    
+    // Create a new session if none exists
+    if (!sessionId && user) {
+      sessionId = await createSession();
+      if (!sessionId) return;
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -125,6 +279,18 @@ export function usePharmaChat() {
 
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+
+    // Save user message to database
+    if (sessionId) {
+      await saveMessage(sessionId, "user", input.trim());
+      
+      // Update session title based on first message
+      const isFirstMessage = messages.length === 0;
+      if (isFirstMessage) {
+        const title = input.trim().slice(0, 50) + (input.trim().length > 50 ? "..." : "");
+        await updateSessionTitle(sessionId, title);
+      }
+    }
 
     let assistantContent = "";
 
@@ -158,7 +324,13 @@ export function usePharmaChat() {
       await streamChat({
         messages: chatMessages,
         onDelta: upsertAssistant,
-        onDone: () => setIsLoading(false),
+        onDone: async () => {
+          setIsLoading(false);
+          // Save assistant message to database
+          if (sessionId && assistantContent) {
+            await saveMessage(sessionId, "assistant", assistantContent);
+          }
+        },
         onError: (error) => {
           toast.error(error);
           setIsLoading(false);
@@ -169,7 +341,31 @@ export function usePharmaChat() {
       toast.error("Failed to send message. Please try again.");
       setIsLoading(false);
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, currentSessionId, user]);
 
-  return { messages, isLoading, sendMessage };
+  const startNewChat = async () => {
+    if (!user) {
+      setMessages([]);
+      setCurrentSessionId(null);
+      return;
+    }
+    await createSession();
+  };
+
+  const selectSession = async (sessionId: string) => {
+    await loadMessages(sessionId);
+  };
+
+  return { 
+    messages, 
+    isLoading, 
+    sendMessage,
+    sessions,
+    currentSessionId,
+    isLoadingSessions,
+    startNewChat,
+    selectSession,
+    deleteSession,
+    loadSessions,
+  };
 }

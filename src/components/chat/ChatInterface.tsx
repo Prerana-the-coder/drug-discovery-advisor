@@ -14,12 +14,15 @@ import {
   Pill,
   X,
   Download,
-  FileText
+  FileText,
+  PanelLeftClose,
+  PanelLeft
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePharmaChat, ChatMessage } from "@/hooks/usePharmaChat";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { ChatHistory } from "./ChatHistory";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,17 +38,57 @@ const suggestedQuestions = [
   "Generate an innovation strategy for cardiovascular drugs",
 ];
 
+// Voice ID mapping for ElevenLabs
+const voiceIdMap: Record<string, string> = {
+  sarah: "EXAVITQu4vr4xnSDxMaL",
+  roger: "CwhRBWXzGAHq8TQ4Fs17",
+  alice: "Xb7hH8MSUJpSbSDYk0k2",
+  brian: "nPczCjzI2devNBz1zQrb",
+  lily: "pFZP5JQG7iQjIQuC4Bku",
+};
+
 export function ChatInterface() {
-  const { messages, isLoading, sendMessage } = usePharmaChat();
+  const { 
+    messages, 
+    isLoading, 
+    sendMessage,
+    sessions,
+    currentSessionId,
+    isLoadingSessions,
+    startNewChat,
+    selectSession,
+    deleteSession,
+  } = usePharmaChat();
+  
   const [input, setInput] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(true);
+  const [voiceSettings, setVoiceSettings] = useState({
+    enabled: true,
+    voice: "sarah"
+  });
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
+
+  // Load voice settings from localStorage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem("medlens_settings");
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        setVoiceSettings({
+          enabled: settings.voiceEnabled ?? true,
+          voice: settings.selectedVoice ?? "sarah"
+        });
+      } catch {}
+    }
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -93,7 +136,6 @@ export function ChatInterface() {
       
       if (error) throw error;
       
-      // Add the result as a message
       sendMessage(`[Medicine Detection Result]\n\n${data.result}`);
       setSelectedImage(null);
     } catch (err) {
@@ -109,8 +151,15 @@ export function ChatInterface() {
   };
 
   const speakMessage = async (message: ChatMessage) => {
+    if (!voiceSettings.enabled) {
+      toast({
+        title: "Voice disabled",
+        description: "Enable voice output in Profile Settings to use this feature.",
+      });
+      return;
+    }
+
     if (isSpeaking && speakingMessageId === message.id) {
-      // Stop speaking
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -124,6 +173,8 @@ export function ChatInterface() {
     setSpeakingMessageId(message.id);
 
     try {
+      const voiceId = voiceIdMap[voiceSettings.voice] || voiceIdMap.sarah;
+      
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-speech`,
         {
@@ -133,7 +184,10 @@ export function ChatInterface() {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ text: message.content.slice(0, 4000) }),
+          body: JSON.stringify({ 
+            text: message.content.slice(0, 4000),
+            voiceId 
+          }),
         }
       );
 
@@ -251,266 +305,309 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] max-h-[800px]">
-      {/* Header with Export */}
-      {messages.length > 0 && (
-        <div className="flex justify-end mb-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={exportAsText}>
-                <FileText className="w-4 h-4 mr-2" />
-                Export as Text (.txt)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportAsMarkdown}>
-                <FileText className="w-4 h-4 mr-2" />
-                Export as Markdown (.md)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={exportAsJSON}>
-                <FileText className="w-4 h-4 mr-2" />
-                Export as JSON (.json)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      )}
+    <div className="flex h-[calc(100vh-8rem)] max-h-[800px] gap-4">
+      {/* Chat History Sidebar */}
+      <div className={cn(
+        "flex-shrink-0 border border-border rounded-xl bg-card/50 transition-all duration-300 overflow-hidden",
+        showHistory ? "w-72" : "w-0 border-0"
+      )}>
+        {showHistory && (
+          <ChatHistory
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            isLoading={isLoadingSessions}
+            onNewChat={startNewChat}
+            onSelectSession={selectSession}
+            onDeleteSession={deleteSession}
+          />
+        )}
+      </div>
 
-      {/* Messages Area */}
-      <ScrollArea ref={scrollRef} className="flex-1 pr-4">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center px-4">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-3xl blur-xl animate-pulse-slow" />
-              <div className="relative p-6 rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/20 mb-6">
-                <Sparkles className="w-12 h-12 text-primary animate-float" />
-              </div>
-            </div>
-            <h2 className="font-display text-3xl font-bold mb-2 gradient-text">
-              Medlens AI Assistant
-            </h2>
-            <p className="text-muted-foreground max-w-md mb-8">
-              Your intelligent partner for pharmaceutical innovation, drug analysis, and strategic insights.
-            </p>
-            
-            {/* Medicine Detection Card */}
-            <div className="w-full max-w-md mb-8">
-              <div className="glass-card rounded-2xl p-4 border border-primary/20 hover:border-primary/40 transition-colors">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-accent">
-                    <Pill className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Medicine Detection</h3>
-                    <p className="text-xs text-muted-foreground">Upload a photo to identify medicines</p>
-                  </div>
-                </div>
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <ImageIcon className="w-4 h-4 mr-2" />
-                  Upload Medicine Photo
+      {/* Main Chat Area */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowHistory(!showHistory)}
+            className="h-9 w-9"
+          >
+            {showHistory ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5" />}
+          </Button>
+          
+          {messages.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
                 </Button>
-              </div>
-            </div>
-            
-            <div className="w-full max-w-2xl">
-              <p className="text-sm font-medium text-muted-foreground mb-3">
-                Try asking:
-              </p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {suggestedQuestions.map((question, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestionClick(question)}
-                    className="text-sm px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-all hover:scale-105 text-left"
-                  >
-                    {question}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-6 py-4">
-            {messages.map((message, index) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex gap-4 animate-fade-in",
-                  message.role === "user" ? "flex-row-reverse" : ""
-                )}
-                style={{ animationDelay: `${index * 0.05}s` }}
-              >
-                <div
-                  className={cn(
-                    "flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg",
-                    message.role === "user"
-                      ? "bg-gradient-to-br from-primary to-primary/80"
-                      : "bg-gradient-to-br from-accent to-primary"
-                  )}
-                >
-                  {message.role === "user" ? (
-                    <User className="w-5 h-5 text-white" />
-                  ) : (
-                    <Bot className="w-5 h-5 text-white" />
-                  )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportAsText}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export as Text (.txt)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportAsMarkdown}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export as Markdown (.md)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportAsJSON}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export as JSON (.json)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+
+        {/* Messages Area */}
+        <ScrollArea ref={scrollRef} className="flex-1 pr-4">
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center px-4">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-accent/30 rounded-3xl blur-xl animate-pulse-slow" />
+                <div className="relative p-6 rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/20 mb-6">
+                  <Sparkles className="w-12 h-12 text-primary animate-float" />
                 </div>
+              </div>
+              <h2 className="font-display text-3xl font-bold mb-2 gradient-text">
+                Medlens AI Assistant
+              </h2>
+              <p className="text-muted-foreground max-w-md mb-8">
+                Your intelligent partner for pharmaceutical innovation, drug analysis, and strategic insights.
+              </p>
+              
+              {/* Medicine Detection Card */}
+              <div className="w-full max-w-md mb-8">
+                <div className="glass-card rounded-2xl p-4 border border-primary/20 hover:border-primary/40 transition-colors">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-accent">
+                      <Pill className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Medicine Detection</h3>
+                      <p className="text-xs text-muted-foreground">Upload a photo to identify medicines</p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <ImageIcon className="w-4 h-4 mr-2" />
+                    Upload Medicine Photo
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Voice Status */}
+              <div className="w-full max-w-md mb-6">
+                <div className={cn(
+                  "flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm",
+                  voiceSettings.enabled 
+                    ? "bg-primary/10 text-primary border border-primary/20" 
+                    : "bg-muted text-muted-foreground border border-border"
+                )}>
+                  <Volume2 className="w-4 h-4" />
+                  Voice Output: {voiceSettings.enabled ? `Enabled (${voiceSettings.voice})` : "Disabled"}
+                </div>
+              </div>
+              
+              <div className="w-full max-w-2xl">
+                <p className="text-sm font-medium text-muted-foreground mb-3">
+                  Try asking:
+                </p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {suggestedQuestions.map((question, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSuggestionClick(question)}
+                      className="text-sm px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground transition-all hover:scale-105 text-left"
+                    >
+                      {question}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6 py-4">
+              {messages.map((message, index) => (
                 <div
+                  key={message.id}
                   className={cn(
-                    "flex-1 max-w-[80%] rounded-2xl px-5 py-4 shadow-md",
-                    message.role === "user"
-                      ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground ml-auto"
-                      : "glass-card border border-border/50"
+                    "flex gap-4 animate-fade-in",
+                    message.role === "user" ? "flex-row-reverse" : ""
                   )}
+                  style={{ animationDelay: `${index * 0.05}s` }}
                 >
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                    {message.content}
+                  <div
+                    className={cn(
+                      "flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg",
+                      message.role === "user"
+                        ? "bg-gradient-to-br from-primary to-primary/80"
+                        : "bg-gradient-to-br from-accent to-primary"
+                    )}
+                  >
+                    {message.role === "user" ? (
+                      <User className="w-5 h-5 text-white" />
+                    ) : (
+                      <Bot className="w-5 h-5 text-white" />
+                    )}
                   </div>
                   <div
                     className={cn(
-                      "flex items-center justify-between mt-3 pt-2 border-t",
+                      "flex-1 max-w-[80%] rounded-2xl px-5 py-4 shadow-md",
                       message.role === "user"
-                        ? "text-primary-foreground/70 border-primary-foreground/20"
-                        : "text-muted-foreground border-border/50"
+                        ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground ml-auto"
+                        : "glass-card border border-border/50"
                     )}
                   >
-                    <span className="text-xs">
-                      {message.timestamp.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    {message.role === "assistant" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 hover:bg-primary/10"
-                        onClick={() => speakMessage(message)}
-                      >
-                        {isSpeaking && speakingMessageId === message.id ? (
-                          <VolumeX className="w-4 h-4 text-destructive" />
-                        ) : (
-                          <Volume2 className="w-4 h-4" />
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {isLoading && messages[messages.length - 1]?.role === "user" && (
-              <div className="flex gap-4 animate-fade-in">
-                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-primary flex items-center justify-center shadow-lg">
-                  <Bot className="w-5 h-5 text-white" />
-                </div>
-                <div className="glass-card border border-border/50 rounded-2xl px-5 py-4">
-                  <div className="flex items-center gap-3 text-muted-foreground">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {message.content}
                     </div>
-                    <span className="text-sm">Analyzing pharmaceutical data...</span>
+                    <div
+                      className={cn(
+                        "flex items-center justify-between mt-3 pt-2 border-t",
+                        message.role === "user"
+                          ? "text-primary-foreground/70 border-primary-foreground/20"
+                          : "text-muted-foreground border-border/50"
+                      )}
+                    >
+                      <span className="text-xs">
+                        {message.timestamp.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {message.role === "assistant" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 hover:bg-primary/10"
+                          onClick={() => speakMessage(message)}
+                          title={voiceSettings.enabled ? "Read aloud" : "Voice disabled - enable in Profile Settings"}
+                        >
+                          {isSpeaking && speakingMessageId === message.id ? (
+                            <VolumeX className="w-4 h-4 text-destructive" />
+                          ) : (
+                            <Volume2 className={cn("w-4 h-4", !voiceSettings.enabled && "opacity-50")} />
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-      </ScrollArea>
+              ))}
+              {isLoading && messages[messages.length - 1]?.role === "user" && (
+                <div className="flex gap-4 animate-fade-in">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-primary flex items-center justify-center shadow-lg">
+                    <Bot className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="glass-card border border-border/50 rounded-2xl px-5 py-4">
+                    <div className="flex items-center gap-3 text-muted-foreground">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </div>
+                      <span className="text-sm">Analyzing pharmaceutical data...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </ScrollArea>
 
-      {/* Image Preview */}
-      {selectedImage && (
-        <div className="border-t border-border pt-4 mt-4">
-          <div className="flex items-start gap-4 p-4 rounded-xl bg-card border border-border">
-            <img 
-              src={selectedImage} 
-              alt="Selected medicine" 
-              className="w-24 h-24 object-cover rounded-lg"
-            />
-            <div className="flex-1">
-              <p className="text-sm font-medium mb-2">Medicine Image Selected</p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Click analyze to identify this medicine and get detailed information.
-              </p>
-              <div className="flex gap-2">
-                <Button 
-                  onClick={analyzeMedicine} 
-                  disabled={isAnalyzingImage}
-                  size="sm"
-                  variant="gradient"
-                >
-                  {isAnalyzingImage ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Pill className="w-4 h-4 mr-2" />
-                      Analyze Medicine
-                    </>
-                  )}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setSelectedImage(null)}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
+        {/* Image Preview */}
+        {selectedImage && (
+          <div className="border-t border-border pt-4 mt-4">
+            <div className="flex items-start gap-4 p-4 rounded-xl bg-card border border-border">
+              <img 
+                src={selectedImage} 
+                alt="Selected medicine" 
+                className="w-24 h-24 object-cover rounded-lg"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-2">Medicine Image Selected</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Click analyze to identify this medicine and get detailed information.
+                </p>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={analyzeMedicine} 
+                    disabled={isAnalyzingImage}
+                    size="sm"
+                    variant="gradient"
+                  >
+                    {isAnalyzingImage ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Pill className="w-4 h-4 mr-2" />
+                        Analyze Medicine
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSelectedImage(null)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Input Area */}
-      <div className="border-t border-border pt-4 mt-4">
-        <div className="flex gap-3">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImageSelect}
-            accept="image/*"
-            className="hidden"
-          />
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-[60px] w-[60px] flex-shrink-0"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <ImageIcon className="w-5 h-5" />
-          </Button>
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask about drug repurposing, clinical trials, patents, or upload a medicine photo..."
-            className="min-h-[60px] max-h-[150px] resize-none bg-card border-border/50 focus:border-primary/50"
-            disabled={isLoading}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            variant="gradient"
-            size="icon"
-            className="h-[60px] w-[60px] flex-shrink-0"
-          >
-            <Send className="w-5 h-5" />
-          </Button>
+        {/* Input Area */}
+        <div className="border-t border-border pt-4 mt-4">
+          <div className="flex gap-3">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageSelect}
+              accept="image/*"
+              className="hidden"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-[60px] w-[60px] flex-shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <ImageIcon className="w-5 h-5" />
+            </Button>
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask about drug repurposing, clinical trials, patents, or upload a medicine photo..."
+              className="min-h-[60px] max-h-[150px] resize-none bg-card border-border/50 focus:border-primary/50"
+              disabled={isLoading}
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || isLoading}
+              variant="gradient"
+              size="icon"
+              className="h-[60px] w-[60px] flex-shrink-0"
+            >
+              <Send className="w-5 h-5" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground text-center mt-3">
+            Designed & Developed by Prerana • AI responses are based on pharmaceutical innovation frameworks
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground text-center mt-3">
-          Designed & Developed by Prerana • AI responses are based on pharmaceutical innovation frameworks
-        </p>
       </div>
     </div>
   );

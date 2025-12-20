@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const { text, voiceId } = await req.json();
-    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY_1") || Deno.env.get("ELEVENLABS_API_KEY");
 
     console.log("API Key exists:", !!ELEVENLABS_API_KEY);
     console.log("API Key length:", ELEVENLABS_API_KEY?.length || 0);

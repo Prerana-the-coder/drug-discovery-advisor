@@ -26,6 +26,7 @@ const ProfilePage = () => {
   // Settings state
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [selectedVoice, setSelectedVoice] = useState("sarah");
+  const [voiceAutoPlay, setVoiceAutoPlay] = useState(false);
   const [notifications, setNotifications] = useState(true);
 
   useEffect(() => {
@@ -50,6 +51,7 @@ const ProfilePage = () => {
         const settings = JSON.parse(savedSettings);
         setVoiceEnabled(settings.voiceEnabled ?? true);
         setSelectedVoice(settings.selectedVoice ?? "sarah");
+        setVoiceAutoPlay(settings.voiceAutoPlay ?? false);
         setNotifications(settings.notifications ?? true);
       }
       
@@ -63,6 +65,7 @@ const ProfilePage = () => {
     const settings = {
       voiceEnabled,
       selectedVoice,
+      voiceAutoPlay,
       notifications,
       theme,
     };
@@ -73,7 +76,7 @@ const ProfilePage = () => {
     if (!isLoading) {
       saveSettings();
     }
-  }, [voiceEnabled, selectedVoice, notifications, theme]);
+  }, [voiceEnabled, selectedVoice, voiceAutoPlay, notifications, theme]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -288,6 +291,20 @@ const ProfilePage = () => {
             <p className="text-xs text-muted-foreground">
               Choose the voice style for AI responses
             </p>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Auto-Play Responses</Label>
+              <p className="text-sm text-muted-foreground">
+                Automatically read AI responses aloud
+              </p>
+            </div>
+            <Switch
+              checked={voiceAutoPlay}
+              onCheckedChange={setVoiceAutoPlay}
+              disabled={!voiceEnabled}
+            />
           </div>
         </CardContent>
       </Card>

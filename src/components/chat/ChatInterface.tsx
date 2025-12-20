@@ -68,8 +68,10 @@ export function ChatInterface() {
   const [showHistory, setShowHistory] = useState(true);
   const [voiceSettings, setVoiceSettings] = useState({
     enabled: true,
-    voice: "sarah"
+    voice: "sarah",
+    autoPlay: false
   });
+  const [lastMessageCount, setLastMessageCount] = useState(0);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -84,11 +86,25 @@ export function ChatInterface() {
         const settings = JSON.parse(savedSettings);
         setVoiceSettings({
           enabled: settings.voiceEnabled ?? true,
-          voice: settings.selectedVoice ?? "sarah"
+          voice: settings.selectedVoice ?? "sarah",
+          autoPlay: settings.voiceAutoPlay ?? false
         });
       } catch {}
     }
   }, []);
+
+  // Auto-play voice when new assistant message arrives
+  useEffect(() => {
+    if (!voiceSettings.autoPlay || !voiceSettings.enabled || isLoading) return;
+    
+    if (messages.length > lastMessageCount && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === "assistant") {
+        speakMessage(lastMessage);
+      }
+    }
+    setLastMessageCount(messages.length);
+  }, [messages.length, isLoading]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -411,7 +427,9 @@ export function ChatInterface() {
                     : "bg-muted text-muted-foreground border border-border"
                 )}>
                   <Volume2 className="w-4 h-4" />
-                  Voice Output: {voiceSettings.enabled ? `Enabled (${voiceSettings.voice})` : "Disabled"}
+                  Voice: {voiceSettings.enabled 
+                    ? `${voiceSettings.voice}${voiceSettings.autoPlay ? " • Auto-play ON" : ""}` 
+                    : "Disabled"}
                 </div>
               </div>
               

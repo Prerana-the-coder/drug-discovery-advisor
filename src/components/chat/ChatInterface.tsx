@@ -13,6 +13,9 @@ import {
   VolumeX,
   Pill,
   X,
+  Mic,
+  MicOff,
+  Square,
   Download,
   FileText,
   PanelLeftClose,
@@ -72,10 +75,14 @@ export function ChatInterface() {
     autoPlay: false
   });
   const [lastMessageCount, setLastMessageCount] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const { toast } = useToast();
 
   // Load voice settings from localStorage
@@ -227,6 +234,121 @@ export function ChatInterface() {
       });
       setIsSpeaking(false);
       setSpeakingMessageId(null);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        
+        if (audioChunksRef.current.length > 0) {
+          await transcribeAudio();
+        }
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      
+      toast({
+        title: "Recording started",
+        description: "Speak your message, then click stop when done.",
+      });
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      toast({
+        title: "Microphone access denied",
+        description: "Please allow microphone access to use voice input.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const transcribeAudio = async () => {
+    setIsTranscribing(true);
+    
+    try {
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      
+      // Convert blob to base64
+      const reader = new FileReader();
+      const base64Audio = await new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(audioBlob);
+      });
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/speech-to-text`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ audio: base64Audio }),
+        }
+      );
+      
+      if (!response.ok) throw new Error("Transcription failed");
+      
+      const data = await response.json();
+      
+      if (data.text && data.text.trim()) {
+        setInput(data.text.trim());
+        toast({
+          title: "Transcription complete",
+          description: "Your speech has been converted to text.",
+        });
+      } else {
+        toast({
+          title: "No speech detected",
+          description: "Please try speaking more clearly.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error("Transcription error:", err);
+      toast({
+        title: "Transcription failed",
+        description: "Could not convert speech to text. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTranscribing(false);
+      audioChunksRef.current = [];
     }
   };
 
@@ -604,17 +726,36 @@ export function ChatInterface() {
             >
               <ImageIcon className="w-5 h-5" />
             </Button>
+            <Button
+              variant={isRecording ? "destructive" : "outline"}
+              size="icon"
+              className={cn(
+                "h-[60px] w-[60px] flex-shrink-0 transition-all",
+                isRecording && "animate-pulse"
+              )}
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isTranscribing}
+              title={isRecording ? "Stop recording" : "Start voice input"}
+            >
+              {isTranscribing ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : isRecording ? (
+                <Square className="w-5 h-5" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </Button>
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about drug repurposing, clinical trials, patents, or upload a medicine photo..."
+              placeholder={isRecording ? "Recording... Click the stop button when done" : "Ask about drug repurposing, clinical trials, patents, or use voice input..."}
               className="min-h-[60px] max-h-[150px] resize-none bg-card border-border/50 focus:border-primary/50"
-              disabled={isLoading}
+              disabled={isLoading || isRecording}
             />
             <Button
               onClick={handleSend}
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || isLoading || isRecording}
               variant="gradient"
               size="icon"
               className="h-[60px] w-[60px] flex-shrink-0"

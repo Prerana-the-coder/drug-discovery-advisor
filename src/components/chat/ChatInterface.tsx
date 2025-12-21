@@ -474,30 +474,58 @@ export function ChatInterface() {
             {showHistory ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5" />}
           </Button>
           
-          {messages.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={exportAsText}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Export as Text (.txt)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportAsMarkdown}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Export as Markdown (.md)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={exportAsJSON}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Export as JSON (.json)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Auto-play voice toggle */}
+            <Button
+              variant={voiceSettings.autoPlay ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                const newSettings = { ...voiceSettings, autoPlay: !voiceSettings.autoPlay };
+                setVoiceSettings(newSettings);
+                localStorage.setItem("medlens_settings", JSON.stringify({
+                  voiceEnabled: newSettings.enabled,
+                  selectedVoice: newSettings.voice,
+                  voiceAutoPlay: newSettings.autoPlay
+                }));
+                toast({
+                  title: newSettings.autoPlay ? "Auto-play enabled" : "Auto-play disabled",
+                  description: newSettings.autoPlay 
+                    ? "Voice responses will play automatically" 
+                    : "Click the speaker icon to hear responses",
+                });
+              }}
+              className="gap-2"
+              disabled={!voiceSettings.enabled}
+            >
+              {voiceSettings.autoPlay ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              Auto-play
+            </Button>
+
+            {messages.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportAsText}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Export as Text (.txt)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportAsMarkdown}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Export as Markdown (.md)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportAsJSON}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Export as JSON (.json)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
 
         {/* Messages Area */}

@@ -173,6 +173,85 @@ export function ChatInterface() {
     }
   };
 
+  // Split text into chunks at sentence boundaries
+  const splitTextIntoChunks = (text: string, maxChunkSize: number = 1000): string[] => {
+    const chunks: string[] = [];
+    const sentences = text.match(/[^.!?]+[.!?]+\s*/g) || [text];
+    
+    let currentChunk = "";
+    
+    for (const sentence of sentences) {
+      if ((currentChunk + sentence).length <= maxChunkSize) {
+        currentChunk += sentence;
+      } else {
+        if (currentChunk.trim()) {
+          chunks.push(currentChunk.trim());
+        }
+        // If a single sentence is longer than maxChunkSize, split it by words
+        if (sentence.length > maxChunkSize) {
+          const words = sentence.split(/\s+/);
+          currentChunk = "";
+          for (const word of words) {
+            if ((currentChunk + " " + word).length <= maxChunkSize) {
+              currentChunk += (currentChunk ? " " : "") + word;
+            } else {
+              if (currentChunk.trim()) {
+                chunks.push(currentChunk.trim());
+              }
+              currentChunk = word;
+            }
+          }
+        } else {
+          currentChunk = sentence;
+        }
+      }
+    }
+    
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
+    }
+    
+    return chunks;
+  };
+
+  // Generate TTS for a single chunk
+  const generateChunkAudio = async (text: string, voiceId: string): Promise<string> => {
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-speech`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ text, voiceId }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "TTS request failed");
+    }
+
+    const data = await response.json();
+    return `data:audio/mpeg;base64,${data.audioContent}`;
+  };
+
+  // Play audio chunks sequentially
+  const playAudioChunks = async (audioUrls: string[], messageId: string) => {
+    for (let i = 0; i < audioUrls.length; i++) {
+      if (!isSpeaking || speakingMessageId !== messageId) break;
+      
+      await new Promise<void>((resolve, reject) => {
+        audioRef.current = new Audio(audioUrls[i]);
+        audioRef.current.onended = () => resolve();
+        audioRef.current.onerror = () => reject(new Error("Audio playback failed"));
+        audioRef.current.play().catch(reject);
+      });
+    }
+  };
+
   const speakMessage = async (message: ChatMessage) => {
     if (!voiceSettings.enabled) {
       toast({
@@ -197,39 +276,33 @@ export function ChatInterface() {
 
     try {
       const voiceId = voiceIdMap[voiceSettings.voice] || voiceIdMap.sarah;
+      const chunks = splitTextIntoChunks(message.content);
       
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/text-to-speech`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ 
-            text: message.content.slice(0, 1500), // Reduced to stay within quota limits
-            voiceId 
-          }),
-        }
-      );
+      toast({
+        title: `Converting to speech`,
+        description: chunks.length > 1 
+          ? `Processing ${chunks.length} segments...` 
+          : "Processing audio...",
+      });
 
-      if (!response.ok) throw new Error("TTS request failed");
+      // Generate all audio chunks
+      const audioUrls: string[] = [];
+      for (const chunk of chunks) {
+        if (!isSpeaking || speakingMessageId !== message.id) break;
+        const audioUrl = await generateChunkAudio(chunk, voiceId);
+        audioUrls.push(audioUrl);
+      }
 
-      const data = await response.json();
-      const audioUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+      // Play all chunks sequentially
+      await playAudioChunks(audioUrls, message.id);
       
-      audioRef.current = new Audio(audioUrl);
-      audioRef.current.onended = () => {
-        setIsSpeaking(false);
-        setSpeakingMessageId(null);
-      };
-      await audioRef.current.play();
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
     } catch (err) {
       console.error(err);
       toast({
         title: "Error playing audio",
-        description: "Could not generate speech. Please try again.",
+        description: err instanceof Error ? err.message : "Could not generate speech. Please try again.",
         variant: "destructive",
       });
       setIsSpeaking(false);

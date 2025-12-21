@@ -19,7 +19,8 @@ import {
   Download,
   FileText,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  Languages
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePharmaChat, ChatMessage } from "@/hooks/usePharmaChat";
@@ -41,7 +42,7 @@ const suggestedQuestions = [
   "Generate an innovation strategy for cardiovascular drugs",
 ];
 
-// Voice ID mapping for ElevenLabs
+// Voice ID mapping for ElevenLabs (English voices)
 const voiceIdMap: Record<string, string> = {
   sarah: "EXAVITQu4vr4xnSDxMaL",
   roger: "CwhRBWXzGAHq8TQ4Fs17",
@@ -49,6 +50,14 @@ const voiceIdMap: Record<string, string> = {
   brian: "nPczCjzI2devNBz1zQrb",
   lily: "pFZP5JQG7iQjIQuC4Bku",
 };
+
+// Hindi voice mapping
+const hindiVoiceIdMap: Record<string, string> = {
+  kavya: "iruPm0KLDE4HP6TdxZJG",
+  arjun: "TX3LPaxmHKxFdv7VOQHJ",
+};
+
+type TTSLanguage = "english" | "hindi";
 
 export function ChatInterface() {
   const { 
@@ -74,6 +83,8 @@ export function ChatInterface() {
     voice: "sarah",
     autoPlay: false
   });
+  const [ttsLanguage, setTtsLanguage] = useState<TTSLanguage>("english");
+  const isSpeakingRef = useRef(false);
   const [lastMessageCount, setLastMessageCount] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -241,13 +252,21 @@ export function ChatInterface() {
   // Play audio chunks sequentially
   const playAudioChunks = async (audioUrls: string[], messageId: string) => {
     for (let i = 0; i < audioUrls.length; i++) {
-      if (!isSpeaking || speakingMessageId !== messageId) break;
+      if (!isSpeakingRef.current) break;
       
       await new Promise<void>((resolve, reject) => {
-        audioRef.current = new Audio(audioUrls[i]);
-        audioRef.current.onended = () => resolve();
-        audioRef.current.onerror = () => reject(new Error("Audio playback failed"));
-        audioRef.current.play().catch(reject);
+        const audio = new Audio(audioUrls[i]);
+        audioRef.current = audio;
+        
+        audio.oncanplaythrough = () => {
+          audio.play().catch(reject);
+        };
+        audio.onended = () => resolve();
+        audio.onerror = (e) => {
+          console.error("Audio playback error:", e);
+          reject(new Error("Audio playback failed"));
+        };
+        audio.load();
       });
     }
   };
@@ -267,19 +286,28 @@ export function ChatInterface() {
         audioRef.current = null;
       }
       setIsSpeaking(false);
+      isSpeakingRef.current = false;
       setSpeakingMessageId(null);
       return;
     }
 
     setIsSpeaking(true);
+    isSpeakingRef.current = true;
     setSpeakingMessageId(message.id);
 
     try {
-      const voiceId = voiceIdMap[voiceSettings.voice] || voiceIdMap.sarah;
+      // Select voice based on language
+      let voiceId: string;
+      if (ttsLanguage === "hindi") {
+        voiceId = hindiVoiceIdMap.kavya;
+      } else {
+        voiceId = voiceIdMap[voiceSettings.voice] || voiceIdMap.sarah;
+      }
+      
       const chunks = splitTextIntoChunks(message.content);
       
       toast({
-        title: `Converting to speech`,
+        title: `Converting to speech (${ttsLanguage === "hindi" ? "Hindi" : "English"})`,
         description: chunks.length > 1 
           ? `Processing ${chunks.length} segments...` 
           : "Processing audio...",
@@ -288,24 +316,28 @@ export function ChatInterface() {
       // Generate all audio chunks
       const audioUrls: string[] = [];
       for (const chunk of chunks) {
-        if (!isSpeaking || speakingMessageId !== message.id) break;
+        if (!isSpeakingRef.current) break;
         const audioUrl = await generateChunkAudio(chunk, voiceId);
         audioUrls.push(audioUrl);
       }
 
       // Play all chunks sequentially
-      await playAudioChunks(audioUrls, message.id);
+      if (isSpeakingRef.current && audioUrls.length > 0) {
+        await playAudioChunks(audioUrls, message.id);
+      }
       
       setIsSpeaking(false);
+      isSpeakingRef.current = false;
       setSpeakingMessageId(null);
     } catch (err) {
-      console.error(err);
+      console.error("TTS Error:", err);
       toast({
         title: "Error playing audio",
         description: err instanceof Error ? err.message : "Could not generate speech. Please try again.",
         variant: "destructive",
       });
       setIsSpeaking(false);
+      isSpeakingRef.current = false;
       setSpeakingMessageId(null);
     }
   };
@@ -724,19 +756,31 @@ export function ChatInterface() {
                         })}
                       </span>
                       {message.role === "assistant" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 hover:bg-primary/10"
-                          onClick={() => speakMessage(message)}
-                          title={voiceSettings.enabled ? "Read aloud" : "Voice disabled - enable in Profile Settings"}
-                        >
-                          {isSpeaking && speakingMessageId === message.id ? (
-                            <VolumeX className="w-4 h-4 text-destructive" />
-                          ) : (
-                            <Volume2 className={cn("w-4 h-4", !voiceSettings.enabled && "opacity-50")} />
-                          )}
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 hover:bg-primary/10"
+                            onClick={() => setTtsLanguage(ttsLanguage === "english" ? "hindi" : "english")}
+                            title={`Switch to ${ttsLanguage === "english" ? "Hindi" : "English"}`}
+                          >
+                            <Languages className="w-4 h-4" />
+                            <span className="text-xs ml-1">{ttsLanguage === "english" ? "EN" : "HI"}</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 hover:bg-primary/10"
+                            onClick={() => speakMessage(message)}
+                            title={voiceSettings.enabled ? `Read aloud (${ttsLanguage === "english" ? "English" : "Hindi"})` : "Voice disabled - enable in Profile Settings"}
+                          >
+                            {isSpeaking && speakingMessageId === message.id ? (
+                              <VolumeX className="w-4 h-4 text-destructive" />
+                            ) : (
+                              <Volume2 className={cn("w-4 h-4", !voiceSettings.enabled && "opacity-50")} />
+                            )}
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>

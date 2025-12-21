@@ -51,10 +51,10 @@ const voiceIdMap: Record<string, string> = {
   lily: "pFZP5JQG7iQjIQuC4Bku",
 };
 
-// Hindi voice mapping
+// Hindi-compatible multilingual voices (same voices work for both with eleven_multilingual_v2)
 const hindiVoiceIdMap: Record<string, string> = {
-  kavya: "iruPm0KLDE4HP6TdxZJG",
-  arjun: "TX3LPaxmHKxFdv7VOQHJ",
+  rachel: "21m00Tcm4TlvDq8ikWAM",
+  matilda: "XrExE9yKIg1WjnnlVkGX",
 };
 
 type TTSLanguage = "english" | "hindi";
@@ -299,7 +299,7 @@ export function ChatInterface() {
       // Select voice based on language
       let voiceId: string;
       if (ttsLanguage === "hindi") {
-        voiceId = hindiVoiceIdMap.kavya;
+        voiceId = hindiVoiceIdMap.rachel; // Uses multilingual model which supports Hindi
       } else {
         voiceId = voiceIdMap[voiceSettings.voice] || voiceIdMap.sarah;
       }

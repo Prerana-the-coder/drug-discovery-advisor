@@ -57,6 +57,20 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("ElevenLabs API error:", response.status, errorText);
+      
+      // Parse error for better messaging
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.detail?.status === "quota_exceeded") {
+          throw new Error("ElevenLabs quota exceeded. Please try with shorter text or wait for quota reset.");
+        }
+        if (errorData.detail?.status === "detected_unusual_activity") {
+          throw new Error("ElevenLabs account issue. Please check your subscription.");
+        }
+      } catch (parseErr) {
+        // If not JSON, use generic error
+      }
+      
       throw new Error(`ElevenLabs API error: ${response.status}`);
     }
 

@@ -208,7 +208,7 @@ export function ChatInterface() {
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({ 
-            text: message.content.slice(0, 4000),
+            text: message.content.slice(0, 1500), // Reduced to stay within quota limits
             voiceId 
           }),
         }

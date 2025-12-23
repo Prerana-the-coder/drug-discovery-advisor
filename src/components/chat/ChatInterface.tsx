@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { 
   Send, 
   Bot, 
@@ -77,6 +78,7 @@ export function ChatInterface() {
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [audioProgress, setAudioProgress] = useState({ currentChunk: 0, totalChunks: 0, chunkProgress: 0 });
   const [showHistory, setShowHistory] = useState(true);
   const [voiceSettings, setVoiceSettings] = useState({
     enabled: true,
@@ -249,19 +251,33 @@ export function ChatInterface() {
     return `data:audio/mpeg;base64,${data.audioContent}`;
   };
 
-  // Play audio chunks sequentially
+  // Play audio chunks sequentially with progress tracking
   const playAudioChunks = async (audioUrls: string[], messageId: string) => {
+    setAudioProgress({ currentChunk: 0, totalChunks: audioUrls.length, chunkProgress: 0 });
+    
     for (let i = 0; i < audioUrls.length; i++) {
       if (!isSpeakingRef.current) break;
+      
+      setAudioProgress(prev => ({ ...prev, currentChunk: i + 1, chunkProgress: 0 }));
       
       await new Promise<void>((resolve, reject) => {
         const audio = new Audio(audioUrls[i]);
         audioRef.current = audio;
         
+        audio.ontimeupdate = () => {
+          if (audio.duration > 0) {
+            const progress = (audio.currentTime / audio.duration) * 100;
+            setAudioProgress(prev => ({ ...prev, chunkProgress: progress }));
+          }
+        };
+        
         audio.oncanplaythrough = () => {
           audio.play().catch(reject);
         };
-        audio.onended = () => resolve();
+        audio.onended = () => {
+          setAudioProgress(prev => ({ ...prev, chunkProgress: 100 }));
+          resolve();
+        };
         audio.onerror = (e) => {
           console.error("Audio playback error:", e);
           reject(new Error("Audio playback failed"));
@@ -269,6 +285,8 @@ export function ChatInterface() {
         audio.load();
       });
     }
+    
+    setAudioProgress({ currentChunk: 0, totalChunks: 0, chunkProgress: 0 });
   };
 
   const speakMessage = async (message: ChatMessage) => {
@@ -756,30 +774,50 @@ export function ChatInterface() {
                         })}
                       </span>
                       {message.role === "assistant" && (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 hover:bg-primary/10"
-                            onClick={() => setTtsLanguage(ttsLanguage === "english" ? "hindi" : "english")}
-                            title={`Switch to ${ttsLanguage === "english" ? "Hindi" : "English"}`}
-                          >
-                            <Languages className="w-4 h-4" />
-                            <span className="text-xs ml-1">{ttsLanguage === "english" ? "EN" : "HI"}</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 hover:bg-primary/10"
-                            onClick={() => speakMessage(message)}
-                            title={voiceSettings.enabled ? `Read aloud (${ttsLanguage === "english" ? "English" : "Hindi"})` : "Voice disabled - enable in Profile Settings"}
-                          >
-                            {isSpeaking && speakingMessageId === message.id ? (
-                              <VolumeX className="w-4 h-4 text-destructive" />
-                            ) : (
-                              <Volume2 className={cn("w-4 h-4", !voiceSettings.enabled && "opacity-50")} />
-                            )}
-                          </Button>
+                        <div className="flex flex-col gap-2 flex-1">
+                          <div className="flex items-center gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 hover:bg-primary/10"
+                              onClick={() => setTtsLanguage(ttsLanguage === "english" ? "hindi" : "english")}
+                              title={`Switch to ${ttsLanguage === "english" ? "Hindi" : "English"}`}
+                            >
+                              <Languages className="w-4 h-4" />
+                              <span className="text-xs ml-1">{ttsLanguage === "english" ? "EN" : "HI"}</span>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 hover:bg-primary/10"
+                              onClick={() => speakMessage(message)}
+                              title={voiceSettings.enabled ? `Read aloud (${ttsLanguage === "english" ? "English" : "Hindi"})` : "Voice disabled - enable in Profile Settings"}
+                            >
+                              {isSpeaking && speakingMessageId === message.id ? (
+                                <VolumeX className="w-4 h-4 text-destructive" />
+                              ) : (
+                                <Volume2 className={cn("w-4 h-4", !voiceSettings.enabled && "opacity-50")} />
+                              )}
+                            </Button>
+                          </div>
+                          {/* Audio Progress Indicator */}
+                          {isSpeaking && speakingMessageId === message.id && audioProgress.totalChunks > 0 && (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Volume2 className="w-3 h-3 animate-pulse" />
+                                  Playing...
+                                </span>
+                                <span>
+                                  {audioProgress.currentChunk}/{audioProgress.totalChunks} segments
+                                </span>
+                              </div>
+                              <Progress 
+                                value={((audioProgress.currentChunk - 1) / audioProgress.totalChunks * 100) + (audioProgress.chunkProgress / audioProgress.totalChunks)} 
+                                className="h-1.5"
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

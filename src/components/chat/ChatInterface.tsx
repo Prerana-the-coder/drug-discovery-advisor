@@ -85,7 +85,10 @@ export function ChatInterface() {
     voice: "sarah",
     autoPlay: false
   });
-  const [ttsLanguage, setTtsLanguage] = useState<TTSLanguage>("english");
+  const [ttsLanguage, setTtsLanguage] = useState<TTSLanguage>(() => {
+    const saved = localStorage.getItem("medlens_tts_language");
+    return (saved === "hindi" || saved === "english") ? saved : "english";
+  });
   const isSpeakingRef = useRef(false);
   const [lastMessageCount, setLastMessageCount] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
@@ -112,6 +115,11 @@ export function ChatInterface() {
       } catch {}
     }
   }, []);
+
+  // Save TTS language preference to localStorage
+  useEffect(() => {
+    localStorage.setItem("medlens_tts_language", ttsLanguage);
+  }, [ttsLanguage]);
 
   // Auto-play voice when new assistant message arrives
   useEffect(() => {
